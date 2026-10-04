@@ -131,7 +131,7 @@ def validate(model: nn.Module, device: str, loader: DataLoader, votes=1, desc='V
     validation_loss = 0
 
     records = [record for v in range(votes) for record in tqdm(loader, desc=f'Preloading data ... {v}',
-                                                               disable=dist.is_available() and dist.get_rank() > 0)]
+                                                               disable=distributed() and dist.get_rank() > 0)]
     records = [[records[v * len(loader) + i] for v in range(votes)] for i in range(len(loader))]
 
     with tqdm(records, desc=desc, disable=distributed() and dist.get_rank() > 0) as loop, torch.no_grad():
@@ -165,6 +165,9 @@ def validate(model: nn.Module, device: str, loader: DataLoader, votes=1, desc='V
 
 
 def _all_reduce_dict(d, device):
+    if not distributed():
+        return d
+
     # wrap in tensor and use reduce to gpu0 tensor
     output_d = {}
     for (key, value) in sorted(d.items()):
