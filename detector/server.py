@@ -72,6 +72,24 @@ def serve_forever(server, model, tokenizer, device):
     server.serve_forever()
 
 
+def _load_checkpoint_state_dict(model, state_dict):
+    """Allow only known RoBERTa version differences when loading a checkpoint."""
+    incompatible = model.load_state_dict(state_dict, strict=False)
+    # Position buffers and the unused pooler differ across Transformers versions.
+    allowed_keys = {
+        'roberta.embeddings.position_ids',
+        'roberta.pooler.dense.weight',
+        'roberta.pooler.dense.bias',
+    }
+    missing_keys = sorted(set(incompatible.missing_keys) - allowed_keys)
+    unexpected_keys = sorted(set(incompatible.unexpected_keys) - allowed_keys)
+    if missing_keys or unexpected_keys:
+        raise RuntimeError(
+            'Incompatible checkpoint state_dict: '
+            f'missing_keys={missing_keys}, unexpected_keys={unexpected_keys}'
+        )
+
+
 def main(checkpoint, port=8080, device='cuda' if torch.cuda.is_available() else 'cpu'):
     if checkpoint.startswith('gs://'):
         print(f'Downloading {checkpoint}', file=sys.stderr)
@@ -86,7 +104,7 @@ def main(checkpoint, port=8080, device='cuda' if torch.cuda.is_available() else 
     model = RobertaForSequenceClassification.from_pretrained(model_name)
     tokenizer = RobertaTokenizer.from_pretrained(model_name)
 
-    model.load_state_dict(data['model_state_dict'])
+    _load_checkpoint_state_dict(model, data['model_state_dict'])
     model.eval()
 
     print(f'Starting HTTP server on port {port}', file=sys.stderr)
