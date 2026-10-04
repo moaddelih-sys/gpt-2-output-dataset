@@ -1,0 +1,49 @@
+name: Real checkpoint CPU and HTTP smoke test
+
+on:
+  push:
+    branches: ["test/real-checkpoint-smoke-20261004"]
+    paths:
+      - ".github/workflows/real-checkpoint-smoke.yml"
+      - "tools/real_checkpoint_smoke.py"
+
+permissions:
+  contents: read
+
+jobs:
+  real-checkpoint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run mock-based checkpoint regression tests
+        run: python -S -m unittest discover -s tests -p test_server_checkpoint.py -v
+      - name: Install real CPU dependencies
+        run: |
+          python -m pip install --disable-pip-version-check torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip check
+      - name: Download verified original checkpoint and test the unmodified server
+        run: python tools/real_checkpoint_smoke.py
+      - name: Preserve diagnostic logs (not model weights)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-checkpoint-smoke-diagnostics
+          retention-days: 3
+          if-no-files-found: warn
+          path: |
+            smoke-artifacts/smoke-report.json
+            smoke-artifacts/checkpoint-metadata.json
+            smoke-artifacts/dependencies.txt
+            smoke-artifacts/server.log
