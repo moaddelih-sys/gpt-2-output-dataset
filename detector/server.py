@@ -34,7 +34,7 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
         tokens = tokenizer.encode(query)
         all_tokens = len(tokens)
-        tokens = tokens[:tokenizer.max_len - 2]
+        tokens = tokens[:tokenizer.model_max_length - 2]
         used_tokens = len(tokens)
         tokens = torch.tensor([tokenizer.bos_token_id] + tokens + [tokenizer.eos_token_id]).unsqueeze(0)
         mask = torch.ones_like(tokens)
